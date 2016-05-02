@@ -5,7 +5,7 @@ ASSEMBLER=nasm -felf32
 
 # The debug symbols introduced with -g are split out into the
 # separate file kernel.sym below
-CCFLAGS=-g -Isrc/include -std=gnu99 -ffreestanding -O2 -Wall -Wextra
+CCFLAGS=-g -Isrc/kernel/include -std=gnu99 -ffreestanding -O2 -Wall -Wextra
 
 # Configuration for cd image
 GRUBCONFIG=boot/grub.cfg
@@ -48,11 +48,11 @@ $(BOOTLOADER_HEADER): src/multiboot_header.asm
 $(BOOT): src/boot.asm
 	$(ASSEMBLER) src/boot.asm -o $(BOOT)
 
-%.o: src/%.c
+%.o: src/kernel/%.c
 	$(CC) -c $< -o $@ $(CCFLAGS)
 
-$(KERNEL_BIG): $(BOOTLOADER_HEADER) $(BOOT) src/linker.ld kernel.o toolchain_installed
-	$(CC) -T src/linker.ld -o $(KERNEL_BIG) -ffreestanding -O2 -nostdlib $(BOOTLOADER_HEADER) $(BOOT) kernel.o -lgcc
+$(KERNEL_BIG): $(BOOTLOADER_HEADER) $(BOOT) src/linker.ld kernel.o vga.o tty.o toolchain_installed
+	$(CC) -T src/linker.ld -o $(KERNEL_BIG) -ffreestanding -O2 -nostdlib $(BOOTLOADER_HEADER) $(BOOT) kernel.o vga.o tty.o -lgcc
 
 # From the full kernel, extract debug symbols
 $(KERNEL_SYM): $(KERNEL_BIG)
@@ -80,4 +80,4 @@ run: $(ISO)
 	gdb
 
 clean:
-	rm -f $(BOOTLOADER_HEADER) $(BOOT) $(KERNEL) $(KERNEL_BIG) $(KERNEL_SYM) $(ISO)
+	rm -f $(BOOTLOADER_HEADER) $(BOOT) $(KERNEL) $(KERNEL_BIG) $(KERNEL_SYM) $(ISO) *.o
