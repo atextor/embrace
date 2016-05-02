@@ -25,7 +25,7 @@ BOOT=boot.o
 
 ISO=$(SYS_NAME).iso
 
-default: $(KERNEL)
+default: $(ISO)
 
 $(TOOLCHAIN).tar.xz:
 	wget http://newos.org/toolchains/i686-elf-4.9.1-Linux-x86_64.tar.xz
@@ -34,24 +34,29 @@ $(TOOLCHAIN): $(TOOLCHAIN).tar.xz
 	tar xf $(TOOLCHAIN).tar.xz
 	rm -f $(TOOLCHAIN).tar.xz
 
+.PHONY: requirements
+requirements:
+	@which qemu-system-x86_64 > /dev/null || (echo "qemu-system-x86_64 not found." && exit 1)
+	@which nasm > /dev/null || (echo "nasm not found." && exit 1)
+	@which tar > /dev/null || (echo "tar not found." && exit 1)
+	@which grub-mkrescue > /dev/null || (echo "grub-mkrescue not found." && exit 1)
+	@which gdb > /dev/null || (echo "gdb not found." && exit 1)
+	@which xorriso > /dev/null || (echo "xorriso not found." && exit 1)
+	@test -e $(CC) || (echo -e "\nNo toolchain installed. Run 'make install_toolchain'.\n" && exit 1)
+
 .PHONY: install_toolchain
 install_toolchain: $(TOOLCHAIN)
-
-.PHONY: toolchain_installed
-toolchain_installed:
-	@test -e $(CC) > /dev/null || echo -e "\nNo toolchain installed. Run 'make install_toolchain'.\n"
-	@test -e $(CC)
 
 $(BOOTLOADER_HEADER): src/multiboot_header.asm
 	$(ASSEMBLER) src/multiboot_header.asm -o $(BOOTLOADER_HEADER)
 
-$(BOOT): src/boot.asm
+$(BOOT): src/boot.asm requirements
 	$(ASSEMBLER) src/boot.asm -o $(BOOT)
 
-%.o: src/kernel/%.c
+%.o: src/kernel/%.c requirements
 	$(CC) -c $< -o $@ $(CCFLAGS)
 
-$(KERNEL_BIG): $(BOOTLOADER_HEADER) $(BOOT) src/linker.ld kernel.o vga.o tty.o toolchain_installed
+$(KERNEL_BIG): $(BOOTLOADER_HEADER) $(BOOT) src/linker.ld kernel.o vga.o tty.o requirements
 	$(CC) -T src/linker.ld -o $(KERNEL_BIG) -ffreestanding -O2 -nostdlib $(BOOTLOADER_HEADER) $(BOOT) kernel.o vga.o tty.o -lgcc
 
 # From the full kernel, extract debug symbols
@@ -62,16 +67,14 @@ $(KERNEL_SYM): $(KERNEL_BIG)
 $(KERNEL): $(KERNEL_BIG) $(KERNEL_SYM)
 	objcopy --strip-debug $(KERNEL_BIG) $(KERNEL)
 
-$(ISO): $(GRUBCONFIG) $(KERNEL)
+$(ISO): $(GRUBCONFIG) $(KERNEL) requirements
 	rm -rf iso/
 	mkdir -p iso/boot/grub
 	cp $(GRUBCONFIG) iso/boot/grub
 	cp $(KERNEL) iso/boot
-	echo -en "#!/bin/sh\nxorriso $$""* -V $(VOLID)"  > xorriso.sh
-	chmod a+x xorriso.sh
-	grub-mkrescue --xorriso="./xorriso.sh" -o $(ISO) iso &>/dev/null
-	rm -f ./xorriso.sh
-	rm -rf iso 
+	/bin/echo -en "#!/bin/sh\nxorriso $$""* -V $(VOLID)"  > boot/xorriso.sh
+	chmod a+x boot/xorriso.sh
+	grub-mkrescue --xorriso="./boot/xorriso.sh" -o $(ISO) iso
 
 # -s means: Open GDB server on TCP port 1234
 # -S means: Don't start CPU at startup
@@ -80,4 +83,4 @@ run: $(ISO)
 	gdb
 
 clean:
-	rm -f $(BOOTLOADER_HEADER) $(BOOT) $(KERNEL) $(KERNEL_BIG) $(KERNEL_SYM) $(ISO) *.o
+	rm -rf $(BOOTLOADER_HEADER) $(BOOT) $(KERNEL) $(KERNEL_BIG) $(KERNEL_SYM) $(ISO) *.o boot/xorriso.sh iso/

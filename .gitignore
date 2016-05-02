@@ -4,3 +4,5 @@ i686-elf-4.9.1-Linux-x86_64
 *.iso
 *.elf
 *.sym
+boot/xorriso.sh
+iso/
