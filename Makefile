@@ -3,14 +3,27 @@ TOOLCHAIN=$(TARGET)-4.9.1-Linux-x86_64
 CC=$(TOOLCHAIN)/bin/$(TARGET)-gcc
 ASSEMBLER=nasm -felf32
 
-CCFLAGS=-Isrc/include -std=gnu99 -ffreestanding -O2 -Wall -Wextra 
+# The debug symbols introduced with -g are split out into the
+# separate file kernel.sym below
+CCFLAGS=-g -Isrc/include -std=gnu99 -ffreestanding -O2 -Wall -Wextra
 
+# Configuration for cd image
 GRUBCONFIG=boot/grub.cfg
+SYS_NAME=embrace
+VOLID:=`echo $(SYS_NAME) | tr '[:lower:]' '[:upper:]'`
+
+# The kernel including debugging symbols
+KERNEL_BIG=kernel.elf
+# The kernel without debugging symbols that goes into the disk image
 KERNEL=kernel.bin
+# The kernel debugging symbols that can be used in conjunction with
+# the stripped kernel binary
+KERNEL_SYM=kernel.sym
+
 BOOTLOADER_HEADER=multiboot_header.o
 BOOT=boot.o
 
-ISO=embrace.iso
+ISO=$(SYS_NAME).iso
 
 default: $(KERNEL)
 
@@ -38,19 +51,33 @@ $(BOOT): src/boot.asm
 %.o: src/%.c
 	$(CC) -c $< -o $@ $(CCFLAGS)
 
-$(KERNEL): $(BOOTLOADER_HEADER) $(BOOT) src/linker.ld kernel.o toolchain_installed
-	$(CC) -T src/linker.ld -o $(KERNEL) -ffreestanding -O2 -nostdlib $(BOOTLOADER_HEADER) $(BOOT) kernel.o -lgcc
+$(KERNEL_BIG): $(BOOTLOADER_HEADER) $(BOOT) src/linker.ld kernel.o toolchain_installed
+	$(CC) -T src/linker.ld -o $(KERNEL_BIG) -ffreestanding -O2 -nostdlib $(BOOTLOADER_HEADER) $(BOOT) kernel.o -lgcc
+
+# From the full kernel, extract debug symbols
+$(KERNEL_SYM): $(KERNEL_BIG)
+	objcopy --only-keep-debug $(KERNEL_BIG) $(KERNEL_SYM)
+
+# From the full kernel, remove debug symbols
+$(KERNEL): $(KERNEL_BIG) $(KERNEL_SYM)
+	objcopy --strip-debug $(KERNEL_BIG) $(KERNEL)
 
 $(ISO): $(GRUBCONFIG) $(KERNEL)
 	rm -rf iso/
 	mkdir -p iso/boot/grub
 	cp $(GRUBCONFIG) iso/boot/grub
 	cp $(KERNEL) iso/boot
-	grub-mkrescue -o $(ISO) iso
+	echo -en "#!/bin/sh\nxorriso $$""* -V $(VOLID)"  > xorriso.sh
+	chmod a+x xorriso.sh
+	grub-mkrescue --xorriso="./xorriso.sh" -o $(ISO) iso &>/dev/null
+	rm -f ./xorriso.sh
 	rm -rf iso 
 
+# -s means: Open GDB server on TCP port 1234
+# -S means: Don't start CPU at startup
 run: $(ISO)
-	qemu-system-x86_64 -cdrom $(ISO)
+	qemu-system-x86_64 -s -S -cdrom $(ISO) &
+	gdb
 
 clean:
-	rm -f $(BOOTLOADER_HEADER) $(BOOT) $(KERNEL) $(ISO)
+	rm -f $(BOOTLOADER_HEADER) $(BOOT) $(KERNEL) $(KERNEL_BIG) $(KERNEL_SYM) $(ISO)
