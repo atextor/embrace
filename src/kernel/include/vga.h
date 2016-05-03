@@ -6,25 +6,25 @@ static const size_t VGA_HEIGHT = 25;
 
 /* Hardware text mode color constants. */
 enum vga_color {
-	COLOR_BLACK = 0,
-	COLOR_BLUE = 1,
-	COLOR_GREEN = 2,
-	COLOR_CYAN = 3,
-	COLOR_RED = 4,
-	COLOR_MAGENTA = 5,
-	COLOR_BROWN = 6,
-	COLOR_LIGHT_GREY = 7,
-	COLOR_DARK_GREY = 8,
-	COLOR_LIGHT_BLUE = 9,
-	COLOR_LIGHT_GREEN = 10,
-	COLOR_LIGHT_CYAN = 11,
-	COLOR_LIGHT_RED = 12,
-	COLOR_LIGHT_MAGENTA = 13,
-	COLOR_LIGHT_BROWN = 14,
-	COLOR_WHITE = 15,
+	COLOR_BLACK = 0x0,
+	COLOR_BLUE = 0x1,
+	COLOR_GREEN = 0x2,
+	COLOR_CYAN = 0x3,
+	COLOR_RED = 0x4,
+	COLOR_MAGENTA = 0x5,
+	COLOR_BROWN = 0x6,
+	COLOR_LIGHT_GREY = 0x7,
+	COLOR_DARK_GREY = 0x8,
+	COLOR_LIGHT_BLUE = 0x9,
+	COLOR_LIGHT_GREEN = 0xA,
+	COLOR_LIGHT_CYAN = 0xB,
+	COLOR_LIGHT_RED = 0xC,
+	COLOR_LIGHT_MAGENTA = 0xD,
+	COLOR_LIGHT_BROWN = 0xE,
+	COLOR_WHITE = 0xF,
 };
 
-uint8_t make_color(enum vga_color fg, enum vga_color bg);
-uint16_t make_vgaentry(char c, uint8_t color);
+uint8_t vga_make_color(enum vga_color fg, enum vga_color bg);
+uint16_t vga_make_vgaentry(char c, uint8_t color);
 
 #endif

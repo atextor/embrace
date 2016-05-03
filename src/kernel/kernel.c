@@ -8,14 +8,13 @@
 
 void kernel_main() {
 	/* Initialize terminal interface */
-	terminal_initialize();
+	tty_initialize();
 
-	/* Since there is no support for newlines in terminal_putchar
-         * yet, '\n' will produce some VGA specific character instead.
-         * This is normal.
-         */
-	terminal_writestring("Hello, kernel World!");
-	terminal_setcolor(COLOR_LIGHT_GREEN);
-	terminal_writestring("Hello");
+	tty_writestring("Hello, ^4kernel^7 World!");
+	for (size_t i = 0;; i++) {
+		tty_writestring("Hello world ");
+		tty_putchar(i % 10 + '0');
+		tty_putchar('\n');
+	}
 }
 
