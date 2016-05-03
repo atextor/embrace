@@ -1,12 +1,6 @@
 #include <tty.h>
 #include <vga.h>
-
-size_t strlen(const char* str) {
-	size_t ret = 0;
-	while ( str[ret] != 0 )
-		ret++;
-	return ret;
-}
+#include <string.h>
 
 uint8_t tty_default_color;
 size_t tty_row;

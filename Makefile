@@ -1,3 +1,6 @@
+#
+# Settings
+#
 TARGET=i686-elf
 TOOLCHAIN=$(TARGET)-4.9.1-Linux-x86_64
 CC=$(TOOLCHAIN)/bin/$(TARGET)-gcc
@@ -5,7 +8,7 @@ ASSEMBLER=nasm -felf32
 
 # The debug symbols introduced with -g are split out into the
 # separate file kernel.sym below
-CCFLAGS=-g -Isrc/kernel/include -std=gnu99 -ffreestanding -O2 -Wall -Wextra
+CCFLAGS=-g -Isrc/kernel/include -Isrc/libc/include -std=gnu99 -ffreestanding -O2 -Wall -Wextra
 
 # Configuration for cd image
 GRUBCONFIG=boot/grub.cfg
@@ -27,6 +30,9 @@ ISO=$(SYS_NAME).iso
 
 default: $(ISO)
 
+#
+# Toolchain & Build requirements
+#
 $(TOOLCHAIN).tar.xz:
 	wget http://newos.org/toolchains/i686-elf-4.9.1-Linux-x86_64.tar.xz
 
@@ -47,17 +53,37 @@ requirements:
 .PHONY: install_toolchain
 install_toolchain: $(TOOLCHAIN)
 
+#
+# Kernel components
+#
+kernelobj := $(patsubst src/kernel/%.c,bin/kernel/%.o,$(wildcard src/kernel/*.c))
+
 $(BOOTLOADER_HEADER): src/multiboot_header.asm
 	$(ASSEMBLER) src/multiboot_header.asm -o $(BOOTLOADER_HEADER)
 
 $(BOOT): src/boot.asm requirements
 	$(ASSEMBLER) src/boot.asm -o $(BOOT)
 
-%.o: src/kernel/%.c requirements
+bin/kernel/%.o: src/kernel/%.c requirements
+	@mkdir -p bin/kernel
 	$(CC) -c $< -o $@ $(CCFLAGS)
 
-$(KERNEL_BIG): $(BOOTLOADER_HEADER) $(BOOT) src/linker.ld kernel.o vga.o tty.o requirements
-	$(CC) -T src/linker.ld -o $(KERNEL_BIG) -ffreestanding -O2 -nostdlib $(BOOTLOADER_HEADER) $(BOOT) kernel.o vga.o tty.o -lgcc
+#
+# libc
+#
+libcobj := $(patsubst src/libc/%,bin/libc/%.o,$(filter-out src/libc/include,$(wildcard src/libc/*)))
+
+bin/libc/%.o: src/libc/%/*.c requirements
+	@mkdir -p bin/libc
+	$(CC) -c $< -o $@ $(CCFLAGS)
+
+#
+# Kernel & Images
+# 
+allobjects := $(kernelobj) $(libcobj)
+
+$(KERNEL_BIG): $(BOOTLOADER_HEADER) $(BOOT) src/linker.ld $(allobjects) requirements
+	$(CC) -T src/linker.ld -o $(KERNEL_BIG) -ffreestanding -O2 -nostdlib $(BOOTLOADER_HEADER) $(BOOT) $(allobjects) -lgcc
 
 # From the full kernel, extract debug symbols
 $(KERNEL_SYM): $(KERNEL_BIG)
@@ -83,4 +109,4 @@ run: $(ISO)
 	gdb
 
 clean:
-	rm -rf $(BOOTLOADER_HEADER) $(BOOT) $(KERNEL) $(KERNEL_BIG) $(KERNEL_SYM) $(ISO) *.o boot/xorriso.sh iso/
+	rm -rf $(BOOTLOADER_HEADER) $(BOOT) $(KERNEL) $(KERNEL_BIG) $(KERNEL_SYM) $(ISO) bin/ boot/xorriso.sh iso/
