@@ -6,3 +6,4 @@ i686-elf-4.9.1-Linux-x86_64
 *.sym
 boot/xorriso.sh
 iso/
+**/tags
