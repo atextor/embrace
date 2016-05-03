@@ -71,9 +71,9 @@ bin/kernel/%.o: src/kernel/%.c requirements
 #
 # libc
 #
-libcobj := $(patsubst src/libc/%,bin/libc/%.o,$(filter-out src/libc/include,$(wildcard src/libc/*)))
+libcobj := $(patsubst src/libc/%.c,bin/libc/%.o,$(wildcard src/libc/*.c))
 
-bin/libc/%.o: src/libc/%/*.c requirements
+bin/libc/%.o: src/libc/%.c requirements
 	@mkdir -p bin/libc
 	$(CC) -c $< -o $@ $(CCFLAGS)
 
@@ -98,8 +98,8 @@ $(ISO): $(GRUBCONFIG) $(KERNEL) requirements
 	mkdir -p iso/boot/grub
 	cp $(GRUBCONFIG) iso/boot/grub
 	cp $(KERNEL) iso/boot
-	/bin/echo -en "#!/bin/sh\nxorriso $$""* -V $(VOLID)"  > boot/xorriso.sh
-	chmod a+x boot/xorriso.sh
+	@/bin/echo -en "#!/bin/sh\nxorriso $$""* -V $(VOLID)"  > boot/xorriso.sh
+	@chmod a+x boot/xorriso.sh
 	grub-mkrescue --xorriso="./boot/xorriso.sh" -o $(ISO) iso
 
 # -s means: Open GDB server on TCP port 1234
