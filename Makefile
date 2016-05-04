@@ -1,10 +1,11 @@
 #
 # Settings
 #
-TARGET=i686-elf
+TARGET=x86_64-elf
 TOOLCHAIN=$(TARGET)-4.9.1-Linux-x86_64
 CC=$(TOOLCHAIN)/bin/$(TARGET)-gcc
-ASSEMBLER=nasm -felf32
+LD=$(TOOLCHAIN)/bin/$(TARGET)-ld
+ASSEMBLER=nasm -felf64
 
 # The debug symbols introduced with -g are split out into the
 # separate file kernel.sym below
@@ -33,7 +34,7 @@ default: $(ISO)
 # Toolchain & Build requirements
 #
 $(TOOLCHAIN).tar.xz:
-	wget http://newos.org/toolchains/i686-elf-4.9.1-Linux-x86_64.tar.xz
+	wget http://newos.org/toolchains/$(TOOLCHAIN).tar.xz
 
 $(TOOLCHAIN): $(TOOLCHAIN).tar.xz
 	tar xf $(TOOLCHAIN).tar.xz
@@ -79,7 +80,7 @@ bin/libc/%.o: src/libc/%.c requirements
 allobjects := $(kernelobj) $(libcobj)
 
 $(KERNEL_BIG): $(BOOT) src/linker.ld $(allobjects) requirements
-	$(CC) -T src/linker.ld -o $(KERNEL_BIG) -ffreestanding -O2 -nostdlib $(BOOT) $(allobjects) -lgcc
+	$(LD) -n -o $(KERNEL_BIG) -T src/linker.ld $(BOOT) $(allobjects)
 
 # From the full kernel, extract debug symbols
 $(KERNEL_SYM): $(KERNEL_BIG)

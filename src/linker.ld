@@ -9,7 +9,6 @@ SECTIONS {
 		*(.multiboot_header)
 	}
 
-
 	/* Read-only data. */
 	.rodata BLOCK(4K) : ALIGN(4K)
 	{

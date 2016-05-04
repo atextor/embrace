@@ -18,6 +18,42 @@ header_start:
 	dd 8    ; size
 header_end:
 
+; Read-Only data section
+section .rodata
+
+; Global Descriptor Table (GDT) for when we're in long mode (64 bit)
+; This needs to have at least one zero-entry, one code entry and one
+; data entry. Entries in the GDT are also sometimes called gates.
+; Each entry is always 8 bytes long and has the following format:
+; Bit(s)  Name                   Meaning
+; 0-15    limit 0-15             the first 2 byte of the segment’s limit
+; 16-39   base 0-23              the first 3 byte of the segment’s base address
+; 40      accessed               set by the CPU when the segment is accessed
+; 41      read/write             reads allowed for code segments / writes allowed for data segments
+; 42      direction/conforming   the segment grows down (i.e. base>limit) for data segments / the current privilege level can be higher than the specified level for code segments (else it must match exactly)
+; 43      executable             if set, it’s a code segment, else it’s a data segment
+; 44      descriptor type        should be 1 for code and data segments
+; 45-46   privilege              the ring level: 0 for kernel, 3 for user
+; 47      present                must be 1 for valid selectors
+; 48-51   limit 16-19            bits 16 to 19 of the segment’s limit
+; 52      available              freely available to the OS
+; 53      64-bit                 should be set for 64-bit code segments
+; 54      32-bit                 should be set for 32-bit segments
+; 55      granularity            if it’s set, the limit is the number of pages, else it’s a byte number
+; 56-63   base 24-31             the last byte of the base address
+gdt64:
+	; zero entry
+	dq 0
+	; code segment
+.code: equ $ - gdt64
+	dq (1<<44) | (1<<47) | (1<<41) | (1<<43) | (1<<53)
+	; data segment
+.data equ $ - gdt64
+	dq (1<<44) | (1<<47) | (1<<41)
+.pointer:
+	dw $ - gdt64 - 1
+	dq gdt64
+
 ; Data section
 section .bss
 align 4096
@@ -41,11 +77,9 @@ stack_bottom:
 stack_top:
 
 section .bootstrap_stack, nobits
-; Setup temporary stack
 align 4 
 
 ; Code section
-global _start 
 section .text
 bits 32
 
@@ -55,28 +89,33 @@ _start:
 	; our stack (as it grows downwards).
 	mov esp, stack_top
 
-	; The one thing we must do here, before register eax is overwritten, is
-	; to make sure that we were booted using multiboot 2
+	; Make sure that we were booted using multiboot 2
 	call check_multiboot
+
+	; Check if CPUID instruction is available
 	call check_cpuid
+
+	; Check if long mode is available, using CPUID
 	call check_long_mode 
+
+	; Set up page tables
 	call set_up_page_tables
+
+	; Set up paging
 	call enable_paging
 
-	; Call kernel_main from kernel.c
-	extern kernel_main
-	call kernel_main
+	; Load the 64-bit GDT
+	lgdt [gdt64.pointer]
 
-global hang
-hang:
-	; In case the function returns, we'll want to put the computer into an
-	; infinite loop. To do that, we use the clear interrupt ('cli') instruction
-	; to disable interrupts, the halt instruction ('hlt') to stop the CPU until
-	; the next interrupt arrives, and jumping to the halt instruction if it ever
-	; continues execution, just to be safe.
-	cli
-	hlt
-	jmp hang
+	; Update selectors
+	mov ax, gdt64.data
+	mov ss, ax  ; stack selector
+	mov ds, ax  ; data selector
+	mov es, ax  ; extra selector
+
+	; last step towards long mode: long jump to the 64 bit code
+	; This is the only way to set up the code selector
+	jmp gdt64.code:long_mode_start
 
 ; Displays an error code, if something goes wrong here.
 ; Will display 'ERR: x', with x being an error code symbol.
@@ -88,7 +127,10 @@ error:
 	mov dword [0xb8004], 0x073A0752  ; :R
 	mov dword [0xb8008], 0x07200720  ; '  '
 	mov byte  [0xb800a], al
-	jmp hang
+.hang:
+	cli
+	hlt
+	jmp .hang
 
 ; Checks if register eax contains the multiboot 2 magic string,
 ; as specified by the multiboot 2 spec, because we rely on multiboot 2
@@ -204,3 +246,25 @@ enable_paging:
 	mov cr0, eax
 
 	ret
+
+
+;
+; 64 bit part! This is only valid after the incantations in _start
+; (checking if paging is available, setting up paging, building 64bit GDT,
+; updating segment selectors and longjumping to here.
+;
+global long_mode_start
+
+section .text
+bits 64
+long_mode_start:
+	; Call kernel_main from kernel.c, which of course must be compiled for x86_64
+	extern kernel_main
+	call kernel_main
+
+; last resort if kernel_main returns
+hang64:
+	cli
+	hlt
+	jmp hang64
+	
