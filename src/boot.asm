@@ -8,8 +8,8 @@ align 4096
 ; p1 a.k.a. page map level 4 table (PML4)
 ; Each page table entry is 8 bytes, and each table
 ; contains 512 entries, so each size is 512*9 = 4096.
-; This is in the .bss section, because GRUB will initialize it with 0,
-; so it's already valid.
+; This is in the .bss section, and because GRUB will initialize it with 0,
+; it's already valid (although useless)
 p4_table:
     resb 4096
 p3_table:
@@ -37,61 +37,43 @@ _start:
 	; our stack (as it grows downwards).
 	mov esp, stack_top
 
-	; Make sure that we were booted using multiboot 2
+	; The one thing we must do here, before register eax is overwritten, is
+	; to make sure that we were booted using multiboot 2
 	call check_multiboot
-
-	; Check if the CPUID instruction is available
-	call check_cpuid
-
-	; Now use CPUID to check if long mode is available
-	call check_long_mode
-
-	; Link p4, p3 and p2 tables
-	call set_up_page_tables
-
-	; Enable paging
-	call enable_paging
 
 	; Call kernel_main from kernel.c
 	extern kernel_main
 	call kernel_main
 
+global hang
+hang:
 	; In case the function returns, we'll want to put the computer into an
 	; infinite loop. To do that, we use the clear interrupt ('cli') instruction
 	; to disable interrupts, the halt instruction ('hlt') to stop the CPU until
 	; the next interrupt arrives, and jumping to the halt instruction if it ever
 	; continues execution, just to be safe.
 	cli
-
-hang:
 	hlt
-	jmp hang
- 
-; Displays an error code, if something goes wrong here.
-; Will display 'ERR: x', with x being an error code symbol.
-; 0xb8000 is the base address of the VGA text buffer.
-; 0x07 = light grey text on black background (see vga.h)
-; 0x52 = R, 0x45 = E, 0x3A = :, 0x20 = ' '
-error:
-	mov dword [0xb8000], 0x07520745  ; RE
-	mov dword [0xb8004], 0x073A0752  ; :R
-	mov dword [0xb8008], 0x07200720  ; '  '
-	mov byte  [0xb800a], al
 	jmp hang
 
 ; Checks if register eax contains the multiboot 2 magic string,
 ; as specified by the multiboot 2 spec, because we rely on multiboot 2
 ; features later.
+extern kernel_error
+extern tty_initialize
 check_multiboot:
-    cmp eax, 0x36d76289  ; magic string that the bootloader will write
-    jne .no_multiboot
-    ret
+	cmp eax, 0x36d76289  ; magic string that the bootloader will write
+	jne .no_multiboot
+	ret
 .no_multiboot:
-    mov al, "0"
-    jmp error
+	call tty_initialize
+	push dword 0x0       ; Error code, see corresponding message in kernel.c
+	call kernel_error
+	jmp hang
 
 ; Check if CPUID is supported by attempting to flip the ID bit (bit 21)
 ; in the FLAGS register. If we can flip it, CPUID is available.
+global check_cpuid
 check_cpuid: 
 	; Copy FLAGS in to EAX via stack
 	pushfd
@@ -122,10 +104,12 @@ check_cpuid:
 	je .no_cpuid
 	ret
 .no_cpuid:
-	mov al, "1"
-	jmp error
+	push dword 0x1       ; Error code, see corresponding message in kernel.c
+	call kernel_error
+	jmp hang
 
 ; Use the CPUID instruction to check if long mode is available
+global check_long_mode
 check_long_mode:
 	; test if extended processor info in available
 	mov eax, 0x80000000     ; implicit argument for cpuid
@@ -140,9 +124,11 @@ check_long_mode:
 	jz .no_long_mode        ; If it's not set, there is no long mode
 	ret
 .no_long_mode:
-	mov al, "2"
-	jmp error
+	push dword 0x2       ; Error code, see corresponding message in kernel.c
+	call kernel_error
+	jmp hang
 
+global set_up_page_tables
 set_up_page_tables:
 	; map first P4 entry to P3 table
 	mov eax, p3_table
@@ -171,6 +157,7 @@ set_up_page_tables:
 
 	ret
 
+global enable_paging
 enable_paging:
 	; load P4 to cr3 register (cpu uses this to access the P4 table)
 	mov eax, p4_table
