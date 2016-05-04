@@ -40,6 +40,10 @@ _start:
 	; The one thing we must do here, before register eax is overwritten, is
 	; to make sure that we were booted using multiboot 2
 	call check_multiboot
+	call check_cpuid
+	call check_long_mode 
+	call set_up_page_tables
+	call enable_paging
 
 	; Call kernel_main from kernel.c
 	extern kernel_main
@@ -56,24 +60,31 @@ hang:
 	hlt
 	jmp hang
 
+; Displays an error code, if something goes wrong here.
+; Will display 'ERR: x', with x being an error code symbol.
+; 0xb8000 is the base address of the VGA text buffer.
+; 0x07 = light grey text on black background (see vga.h)
+; 0x52 = R, 0x45 = E, 0x3A = :, 0x20 = ' '
+error:
+	mov dword [0xb8000], 0x07520745  ; RE
+	mov dword [0xb8004], 0x073A0752  ; :R
+	mov dword [0xb8008], 0x07200720  ; '  '
+	mov byte  [0xb800a], al
+	jmp hang
+
 ; Checks if register eax contains the multiboot 2 magic string,
 ; as specified by the multiboot 2 spec, because we rely on multiboot 2
 ; features later.
-extern kernel_error
-extern tty_initialize
 check_multiboot:
 	cmp eax, 0x36d76289  ; magic string that the bootloader will write
 	jne .no_multiboot
 	ret
 .no_multiboot:
-	call tty_initialize
-	push dword 0x0       ; Error code, see corresponding message in kernel.c
-	call kernel_error
-	jmp hang
+	mov al, "0"
+	jmp error
 
 ; Check if CPUID is supported by attempting to flip the ID bit (bit 21)
 ; in the FLAGS register. If we can flip it, CPUID is available.
-global check_cpuid
 check_cpuid: 
 	; Copy FLAGS in to EAX via stack
 	pushfd
@@ -104,12 +115,10 @@ check_cpuid:
 	je .no_cpuid
 	ret
 .no_cpuid:
-	push dword 0x1       ; Error code, see corresponding message in kernel.c
-	call kernel_error
-	jmp hang
+	mov al, "1"
+	jmp error
 
 ; Use the CPUID instruction to check if long mode is available
-global check_long_mode
 check_long_mode:
 	; test if extended processor info in available
 	mov eax, 0x80000000     ; implicit argument for cpuid
@@ -124,11 +133,9 @@ check_long_mode:
 	jz .no_long_mode        ; If it's not set, there is no long mode
 	ret
 .no_long_mode:
-	push dword 0x2       ; Error code, see corresponding message in kernel.c
-	call kernel_error
-	jmp hang
+	mov al, "2"
+	jmp error
 
-global set_up_page_tables
 set_up_page_tables:
 	; map first P4 entry to P3 table
 	mov eax, p3_table
@@ -157,7 +164,6 @@ set_up_page_tables:
 
 	ret
 
-global enable_paging
 enable_paging:
 	; load P4 to cr3 register (cpu uses this to access the P4 table)
 	mov eax, p4_table
