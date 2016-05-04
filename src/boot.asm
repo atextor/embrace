@@ -1,10 +1,31 @@
 ; vim:ft=nasm
+section .bss
+align 4096
+; Set up page tables.
+; p4 = page table,
+; p3 a.k.a. page directory table (PD),
+; p2 a.k.a. page directory pointer table (PDP),
+; p1 a.k.a. page map level 4 table (PML4)
+; Each page table entry is 8 bytes, and each table
+; contains 512 entries, so each size is 512*9 = 4096.
+; This is in the .bss section, because GRUB will initialize it with 0,
+; so it's already valid.
+p4_table:
+    resb 4096
+p3_table:
+    resb 4096
+p2_table:
+    resb 4096
+stack_bottom:
+    resb 16384
+stack_top:
+
 section .bootstrap_stack, nobits
 ; Setup temporary stack
 align 4 
-stack_bottom:
-resb 16384
-stack_top:
+;stack_bottom:
+;resb 16384
+;stack_top:
 
 global _start 
 section .text
@@ -24,6 +45,12 @@ _start:
 
 	; Now use CPUID to check if long mode is available
 	call check_long_mode
+
+	; Link p4, p3 and p2 tables
+	call set_up_page_tables
+
+	; Enable paging
+	call enable_paging
 
 	; Call kernel_main from kernel.c
 	extern kernel_main
@@ -102,7 +129,7 @@ check_cpuid:
 check_long_mode:
 	; test if extended processor info in available
 	mov eax, 0x80000000     ; implicit argument for cpuid
-	cpuid                   ; get highest supported argument
+	cpuid                   ; get highest supported argument from address eax
 	cmp eax, 0x80000001     ; it needs to be at least 0x80000001
 	jb .no_long_mode        ; if it's less, the CPU is too old for long mode
 
@@ -116,3 +143,53 @@ check_long_mode:
 	mov al, "2"
 	jmp error
 
+set_up_page_tables:
+	; map first P4 entry to P3 table
+	mov eax, p3_table
+	or eax, 0b11            ; present + writable
+	mov [p4_table], eax
+
+	; map first P3 entry to P2 table
+	mov eax, p2_table
+	or eax, 0b11            ; present + writable
+	mov [p3_table], eax
+
+	; map each P2 entry to a huge 2MiB page
+	; By setting the 'huge' bit in a P2 entry, it means the entry
+	; refers to a 2MiB page
+	mov ecx, 0              ; counter variable 
+.map_p2_table:
+	; map ecx-th P2 entry to a huge page that starts at address 2MiB*ecx
+	mov eax, 0x200000       ; 2MiB
+	mul ecx                 ; start address of ecx-th page
+	or eax, 0b10000011      ; present + writable + huge
+	mov [p2_table + ecx * 8], eax ; map ecx-th entry
+
+	inc ecx                 ; increase counter
+	cmp ecx, 512            ; if counter == 512, the whole P2 table is mapped
+	jne .map_p2_table       ; else map the next entry
+
+	ret
+
+enable_paging:
+	; load P4 to cr3 register (cpu uses this to access the P4 table)
+	mov eax, p4_table
+	mov cr3, eax
+
+	; enable PAE-flag in cr4 (Physical Address Extension)
+	mov eax, cr4
+	or eax, 1 << 5
+	mov cr4, eax
+
+	; set the long mode bit in the EFER MSR (model specific register)
+	mov ecx, 0xC0000080     ; magic string: address of the "EFER" model specific register
+	rdmsr                   ; "read model specific register" at address ecx
+	or eax, 1 << 8          ; magic bit: set the "EFER.LME" bit
+	wrmsr                   ; "write model specific register" at address ecx
+
+	; enable paging in the cr0 register
+	mov eax, cr0
+	or eax, 1 << 31
+	mov cr0, eax
+
+	ret
