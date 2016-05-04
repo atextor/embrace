@@ -23,7 +23,6 @@ KERNEL=kernel.bin
 # the stripped kernel binary
 KERNEL_SYM=kernel.sym
 
-BOOTLOADER_HEADER=multiboot_header.o
 BOOT=boot.o
 
 ISO=$(SYS_NAME).iso
@@ -58,9 +57,6 @@ install_toolchain: $(TOOLCHAIN)
 #
 kernelobj := $(patsubst src/kernel/%.c,bin/kernel/%.o,$(wildcard src/kernel/*.c))
 
-$(BOOTLOADER_HEADER): src/multiboot_header.asm
-	$(ASSEMBLER) src/multiboot_header.asm -o $(BOOTLOADER_HEADER)
-
 $(BOOT): src/boot.asm requirements
 	$(ASSEMBLER) src/boot.asm -o $(BOOT)
 
@@ -82,8 +78,8 @@ bin/libc/%.o: src/libc/%.c requirements
 # 
 allobjects := $(kernelobj) $(libcobj)
 
-$(KERNEL_BIG): $(BOOTLOADER_HEADER) $(BOOT) src/linker.ld $(allobjects) requirements
-	$(CC) -T src/linker.ld -o $(KERNEL_BIG) -ffreestanding -O2 -nostdlib $(BOOTLOADER_HEADER) $(BOOT) $(allobjects) -lgcc
+$(KERNEL_BIG): $(BOOT) src/linker.ld $(allobjects) requirements
+	$(CC) -T src/linker.ld -o $(KERNEL_BIG) -ffreestanding -O2 -nostdlib $(BOOT) $(allobjects) -lgcc
 
 # From the full kernel, extract debug symbols
 $(KERNEL_SYM): $(KERNEL_BIG)
@@ -109,4 +105,4 @@ run: $(ISO)
 	gdb
 
 clean:
-	rm -rf $(BOOTLOADER_HEADER) $(BOOT) $(KERNEL) $(KERNEL_BIG) $(KERNEL_SYM) $(ISO) bin/ boot/xorriso.sh iso/
+	rm -rf $(BOOT) $(KERNEL) $(KERNEL_BIG) $(KERNEL_SYM) $(ISO) bin/ boot/xorriso.sh iso/
