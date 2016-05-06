@@ -16,12 +16,12 @@ enum vga_color {
 	COLOR_LIGHT_GREY = 0x7,
 	COLOR_DARK_GREY = 0x8,
 	COLOR_LIGHT_BLUE = 0x9,
-	COLOR_LIGHT_GREEN = 0xA,
-	COLOR_LIGHT_CYAN = 0xB,
-	COLOR_LIGHT_RED = 0xC,
-	COLOR_LIGHT_MAGENTA = 0xD,
-	COLOR_LIGHT_BROWN = 0xE,
-	COLOR_WHITE = 0xF,
+	COLOR_LIGHT_GREEN = 0xa,
+	COLOR_LIGHT_CYAN = 0xb,
+	COLOR_LIGHT_RED = 0xc,
+	COLOR_LIGHT_MAGENTA = 0xd,
+	COLOR_LIGHT_BROWN = 0xd,
+	COLOR_WHITE = 0xf,
 };
 
 uint8_t vga_make_color(enum vga_color fg, enum vga_color bg);

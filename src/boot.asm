@@ -127,10 +127,10 @@ _start:
 ; Will display 'ERR: x', with x being an error code symbol.
 ; 0xb8000 is the base address of the VGA text buffer.
 ; 0x07 = light grey text on black background (see vga.h)
-; 0x52 = R, 0x45 = E, 0x3A = :, 0x20 = ' '
+; 0x52 = R, 0x45 = E, 0x3a = :, 0x20 = ' '
 error:
 	mov dword [0xb8000], 0x07520745  ; RE
-	mov dword [0xb8004], 0x073A0752  ; :R
+	mov dword [0xb8004], 0x073a0752  ; :R
 	mov dword [0xb8008], 0x07200720  ; '  '
 	mov byte  [0xb800a], al
 .hang:
@@ -241,7 +241,7 @@ enable_paging:
 	mov cr4, eax
 
 	; set the long mode bit in the EFER MSR (model specific register)
-	mov ecx, 0xC0000080     ; magic string: address of the "EFER" model specific register
+	mov ecx, 0xc0000080     ; magic string: address of the "EFER" model specific register
 	rdmsr                   ; "read model specific register" at address ecx
 	or eax, 1 << 8          ; magic bit: set the "EFER.LME" bit
 	wrmsr                   ; "write model specific register" at address ecx

@@ -13,7 +13,7 @@ void tty_initialize() {
 	tty_column = 0;
 	tty_default_color = vga_make_color(COLOR_LIGHT_GREY, COLOR_BLACK);
 	tty_color = tty_default_color;
-	tty_buffer = (uint16_t*) 0xB8000;
+	tty_buffer = (uint16_t*) 0xb8000;
 	for (size_t y = 0; y < VGA_HEIGHT; y++) {
 		for (size_t x = 0; x < VGA_WIDTH; x++) {
 			const size_t index = y * VGA_WIDTH + x;
@@ -84,13 +84,13 @@ void tty_writestring(const char* data) {
 }
 
 void tty_putbyte(uint8_t b) {
-	uint8_t temp = (b & 0xF0) >> 4;
+	uint8_t temp = (b & 0xf0) >> 4;
 	if (temp < 10) {
 		tty_putchar(temp + '0');
 	} else {
 		tty_putchar(temp + 'A' - 10);
 	}
-	temp = (b & 0x0F);
+	temp = (b & 0x0f);
 	if (temp < 10) {
 		tty_putchar(temp + '0');
 	} else {
@@ -103,7 +103,7 @@ void tty_writepointer(const void* p) {
 	tty_writestring("0x");
 	uint8_t b;
 	for (size_t i = 0; i < 16; i++) {
-		b = (v >> 60) & 0xF;
+		b = (v >> 60) & 0xf;
 		tty_putchar(b < 10 ? b + '0' : b + 'A' - 10);
 		v <<= 4;
 	}
