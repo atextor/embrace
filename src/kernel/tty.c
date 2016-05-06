@@ -83,3 +83,29 @@ void tty_writestring(const char* data) {
 	}
 }
 
+void tty_putbyte(uint8_t b) {
+	uint8_t temp = (b & 0xF0) >> 4;
+	if (temp < 10) {
+		tty_putchar(temp + '0');
+	} else {
+		tty_putchar(temp + 'A' - 10);
+	}
+	temp = (b & 0x0F);
+	if (temp < 10) {
+		tty_putchar(temp + '0');
+	} else {
+		tty_putchar(temp + 'A' - 10);
+	}
+}
+
+void tty_writepointer(const void* p) {
+	uint64_t v = (uint64_t)p;
+	tty_writestring("0x");
+	uint8_t b;
+	for (size_t i = 0; i < 16; i++) {
+		b = (v >> 60) & 0xF;
+		tty_putchar(b < 10 ? b + '0' : b + 'A' - 10);
+		v <<= 4;
+	}
+}
+

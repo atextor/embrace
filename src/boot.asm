@@ -92,6 +92,12 @@ _start:
 	; Make sure that we were booted using multiboot 2
 	call check_multiboot
 
+	; A multiboot compliant bootloader passes a pointer to a boot information
+	; structure in ebx. To be able to pass this to the kernel, we set the edi
+	; register: The first six arguments to calling a functions are passed in
+	; (64 Bit) registers: rdi, rsi, rdx, rcx, r8, r9
+	mov edi, ebx       ; Move Multiboot info pointer to edi
+
 	; Check if CPUID instruction is available
 	call check_cpuid
 
@@ -263,8 +269,8 @@ long_mode_start:
 	call kernel_main
 
 ; last resort if kernel_main returns
-hang64:
+.hang64:
 	cli
 	hlt
-	jmp hang64
+	jmp .hang64
 	

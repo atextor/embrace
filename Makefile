@@ -102,8 +102,8 @@ $(ISO): $(GRUBCONFIG) $(KERNEL) requirements
 # -s means: Open GDB server on TCP port 1234
 # -S means: Don't start CPU at startup
 run: $(ISO)
-	qemu-system-x86_64 -s -S -cdrom $(ISO) &
-	gdb
+	qemu-system-x86_64 -d int -s -cdrom $(ISO) &
+	#gdb
 
 clean:
 	rm -rf $(BOOT) $(KERNEL) $(KERNEL_BIG) $(KERNEL_SYM) $(ISO) bin/ boot/xorriso.sh iso/
