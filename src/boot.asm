@@ -63,7 +63,7 @@ align 4096
 ; p2 a.k.a. page directory pointer table (PDP),
 ; p1 a.k.a. page map level 4 table (PML4)
 ; Each page table entry is 8 bytes, and each table
-; contains 512 entries, so each size is 512*9 = 4096.
+; contains 512 entries, so each size is 512*8 = 4096.
 ; This is in the .bss section, and because GRUB will initialize it with 0,
 ; it's already valid (although useless)
 p4_table:
